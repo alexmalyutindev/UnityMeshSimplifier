@@ -53,7 +53,7 @@ namespace UnityMeshSimplifier
     /// The mesh simplifier.
     /// Deeply based on https://github.com/sp4cerat/Fast-Quadric-Mesh-Simplification but rewritten completely in C#.
     /// </summary>
-    public sealed class MeshSimplifier
+    public sealed partial class MeshSimplifier
     {
         #region Consts & Static Read-Only
         private const int TriangleEdgeCount = 3;
