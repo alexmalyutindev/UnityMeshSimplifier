@@ -23,6 +23,7 @@ SOFTWARE.
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using UnityMeshSimplifier.Internal;
 
 namespace UnityMeshSimplifier
 {
@@ -36,7 +37,7 @@ namespace UnityMeshSimplifier
             ErrorIsCalculated = 3
         }
 
-        public Triangle containingTriangle;
+        internal Triangle containingTriangle;
         public int vertexA;
         public int vertexB;
         public int vSmall;

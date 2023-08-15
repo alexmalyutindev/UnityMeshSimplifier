@@ -53,6 +53,9 @@ namespace UnityMeshSimplifier.Internal
         public Vector3d n;
         #endregion
 
+        public Ref refCached;
+        public Vector3d nCached;
+
         #region Properties
         public int this[int index]
         {
@@ -100,6 +103,8 @@ namespace UnityMeshSimplifier.Internal
             err0 = err1 = err2 = err3 = 0;
             deleted = dirty = false;
             n = new Vector3d();
+            nCached = n;
+            refCached = new Ref();
         }
         #endregion
 
@@ -132,11 +137,38 @@ namespace UnityMeshSimplifier.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int GetAttributeIndex(int index)
+        {
+            int value;
+            switch (index)
+            {
+                case 0:
+                    value = va0;
+                    break;
+                case 1:
+                    value = va1;
+                    break;
+                case 2:
+                    value = va2;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            return value;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void GetErrors(double[] err)
         {
             err[0] = err0;
             err[1] = err1;
             err[2] = err2;
+        }
+
+        public void ApplyCachedN()
+        {
+            n = nCached;
         }
 
         public override int GetHashCode()

@@ -31,7 +31,7 @@ using System.Runtime.CompilerServices;
 
 namespace UnityMeshSimplifier
 {
-    public class Vertex : IEquatable<Vertex>
+    internal struct Vertex : IEquatable<Vertex>
     {
         public int index;
         public Vector3d p;
@@ -63,6 +63,7 @@ namespace UnityMeshSimplifier
 
         public override int GetHashCode()
         {
+            // TODO: ?
             return base.GetHashCode();
             //return index;
         }

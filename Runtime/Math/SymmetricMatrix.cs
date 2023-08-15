@@ -34,7 +34,7 @@ namespace UnityMeshSimplifier
     /// A symmetric matrix.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    public class SymmetricMatrix
+    public struct SymmetricMatrix
     {
         #region Fields
 
