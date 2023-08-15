@@ -53,32 +53,22 @@ using UnityMeshSimplifier.Internal;
 
 namespace UnityMeshSimplifier
 {
-    internal class Edge
-    {
-        public int vertexA;
-        public int vertexB;
-        public SymmetricMatrix q;
-        public Vector3d p;
-        public double error;
-        public bool isDeleted;
-        public bool isBorder2D;
-        public bool isUVSeam;
-
-        public Edge(int va, int vb)
-        {
-            vertexA = va;
-            vertexB = vb;
-        }
-    }
-
     /// <summary>
     /// The mesh simplifier.
     /// Deeply based on https://github.com/sp4cerat/Fast-Quadric-Mesh-Simplification but rewritten completely in C#.
     /// </summary>
     public sealed partial class MeshSimplifier
     {
-        private ResizableArray<Edge> edgesRA;
-        private ResizableArray<Edge> vtx2edges;
+        private const int EdgeVertexCount = 2;
+
+        private const double DegeneratedTriangleCriteria = 0.9999999999; // if (Vector3d.Dot(e1, e2) > DegeneratedTriangleCriteria) --> triangle is degenerated
+        private const double FlippedTriangleCriteria = 0.0; // if (Vector3d.Dot(ref n, ref t.n) < FlippedTriangleCriteria) --> triangle will flip
+
+        private ResizableArray<Edge> edgesRA = null;
+
+        private ResizableArray<Ref> vtx2tris = null;
+        private ResizableArray<Edge> vtx2edges = null;
+
         private float RecycleRejectedEdgesThreshold;
 
         /// <summary>
