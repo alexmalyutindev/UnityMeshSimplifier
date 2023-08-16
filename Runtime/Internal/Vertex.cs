@@ -31,7 +31,7 @@ using System.Runtime.CompilerServices;
 
 namespace UnityMeshSimplifier
 {
-    internal struct Vertex : IEquatable<Vertex>
+    internal class Vertex : IEquatable<Vertex>
     {
         public int index;
         public Vector3d p;

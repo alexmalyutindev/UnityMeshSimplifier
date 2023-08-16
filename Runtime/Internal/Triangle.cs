@@ -29,7 +29,7 @@ using System.Runtime.CompilerServices;
 
 namespace UnityMeshSimplifier.Internal
 {
-    internal struct Triangle : IEquatable<Triangle>
+    internal class Triangle : IEquatable<Triangle>
     {
         #region Fields
         public int index;

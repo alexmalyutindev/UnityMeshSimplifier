@@ -72,24 +72,13 @@ namespace UnityMeshSimplifier
         private ResizableArray<Edge> edgesRA = null;
         private ResizableArray<Edge> vtx2edges = null;
 
-        private bool regardCurvature = false;
         private float RecycleRejectedEdgesThreshold;
-
-        /// <summary>
-        /// Gets or sets if discrete surface curvature shoudl be taken into account while simplification.
-        /// Default value: false
-        /// </summary>
-        public bool RegardCurvature
-        {
-            get { return regardCurvature; }
-            set { regardCurvature = value; }
-        }
 
         /// <summary>
         /// Calculate a penalty quadrics error matrix to preserve 2D border or uv seam/foldover.
         /// Edge e must be an edge of triangle t. Edge e is a 2D border, uv seam or uv foldover
         /// </summary>
-        private void CalculateEdgePenaltyMatrix(Triangle t, Edge e)
+        private void CalculateEdgePenaltyMatrix(ref Triangle t, Edge e)
         {
             e.qPenaltyBorderVertexA.Clear();
             e.qPenaltyBorderVertexB.Clear();
@@ -117,18 +106,24 @@ namespace UnityMeshSimplifier
         /// </summary>
         /// <param name="e"></param>
         /// <param name="v"></param>
-        private void DistributeEdgePenaltyMatrix(Edge e, Vertex v)
+        private static void DistributeEdgePenaltyMatrix(Edge e, ref Vertex v)
         {
             if (v.index == e.vertexA)
+            {
                 v.qPenaltyEdge.Add(e.qPenaltyBorderVertexA);
+            }
             else
+            {
                 v.qPenaltyEdge.Add(e.qPenaltyBorderVertexB);
+            }
         }
 
         private void DistributeEdgePenaltyMatrix(Edge e)
         {
-            vertices[e.vertexA].qPenaltyEdge.Add(e.qPenaltyBorderVertexA);
-            vertices[e.vertexB].qPenaltyEdge.Add(e.qPenaltyBorderVertexB);
+            ref var va = ref vertices.Data[e.vertexA];
+            va.qPenaltyEdge.Add(e.qPenaltyBorderVertexA);
+            ref var vb = ref vertices.Data[e.vertexA];
+            vb.qPenaltyEdge.Add(e.qPenaltyBorderVertexB);
         }
 
         /// <summary>
@@ -150,8 +145,7 @@ namespace UnityMeshSimplifier
             trisTouchingSurvivedVertexOnly.Clear();
             trisTouchingDeletedVertexOnly.Clear();
             trisTouchingBothVertices.Clear();
-            List<Triangle>[] trisTouchingThisVextexOnly =
-                { trisTouchingSurvivedVertexOnly, trisTouchingDeletedVertexOnly };
+            List<Triangle>[] trisTouchingThisVextexOnly = { trisTouchingSurvivedVertexOnly, trisTouchingDeletedVertexOnly };
 
             if (vertices[edge.vertexA].tcount > vertices[edge.vertexB].tcount)
             {
@@ -167,18 +161,16 @@ namespace UnityMeshSimplifier
             int[] edgeVertex = { survivedIndex, deletedIndex };
 
             // extract triangles touching each vertex and update normals if edge can be contracted
-            Triangle t;
-            Vertex v;
-            Ref r;
-
             for (int j = 0; j < EdgeVertexCount; j++)
             {
                 int notj = j == 0 ? 1 : 0;
-                v = vertices[edgeVertex[j]];
+                ref Vertex v = ref vertices.Data[edgeVertex[j]];
+
                 for (int i = v.tstart; i < v.tstart + v.tcount; i++)
                 {
-                    r = refs[i];
-                    t = triangles[r.tid];
+                    Ref r = refs[i];
+                    ref Triangle t = ref triangles.Data[r.tid];
+
                     if (!t.deleted)
                     {
                         //int v0 = edgeVertex[j]; // v0 is also equals to t[r.tvertex] and v.index;
@@ -189,7 +181,9 @@ namespace UnityMeshSimplifier
                         if (v1 == edgeVertex[notj] || v2 == edgeVertex[notj])
                         {
                             if (!trisTouchingBothVertices.Contains(t))
+                            {
                                 trisTouchingBothVertices.Add(t);
+                            }
                             continue;
                         }
 
@@ -245,7 +239,7 @@ namespace UnityMeshSimplifier
             const double nearZero = 1E-6;
             Vertex va = this.vertices.Data[edge.vertexA];
             Vertex vb = this.vertices.Data[edge.vertexB];
-            SymmetricMatrix q = edge.q;
+            ref SymmetricMatrix q = ref edge.q;
 
             q.Clear();
             q.Add(va.q);
@@ -276,7 +270,7 @@ namespace UnityMeshSimplifier
                     double x = -(q.m3 + q.m1 * y + q.m2 * z) / q.m0; // then x
 
                     edge.p = new Vector3d(x, y, z); // optimal solution
-                    edge.error = Math.Abs(VertexError(q, edge.p.x, edge.p.y, edge.p.z));
+                    edge.error = Math.Abs(VertexError(ref q, edge.p.x, edge.p.y, edge.p.z));
                     //DebugMeshPerf.Data.nrErrorTypeEllipsoid++;
                 }
             }
@@ -287,9 +281,9 @@ namespace UnityMeshSimplifier
                 Vector3d p2 = vb.p;
                 Vector3d p3 = (va.p + vb.p) * 0.5;
 
-                double error1 = Math.Abs(VertexError(q, p1.x, p1.y, p1.z));
-                double error2 = Math.Abs(VertexError(q, p2.x, p2.y, p2.z));
-                double error3 = Math.Abs(VertexError(q, p3.x, p3.y, p3.z));
+                double error1 = Math.Abs(VertexError(ref q, p1.x, p1.y, p1.z));
+                double error2 = Math.Abs(VertexError(ref q, p2.x, p2.y, p2.z));
+                double error3 = Math.Abs(VertexError(ref q, p3.x, p3.y, p3.z));
 
                 if (error1 < error2)
                 {
@@ -319,7 +313,7 @@ namespace UnityMeshSimplifier
             }
 
             double curvatureError = 0;
-            if (RegardCurvature)
+            if (simplificationOptions.PreserveSurfaceCurvature)
             {
                 Vertex vert0 = this.vertices[edge.vertexA];
                 Vertex vert1 = this.vertices[edge.vertexB];
@@ -339,14 +333,15 @@ namespace UnityMeshSimplifier
         /// <param name="degeneratedTriangles">degenerated triangles already count as deleted triangles</param>
         private void InitEdges(out int degeneratedTriangles)
         {
-            var triangles = this.triangles.Data;
+            var trianglesData = this.triangles.Data;
             int triangleCount = this.triangles.Length;
-            var vertices = this.vertices.Data;
+            var verticesData = this.vertices.Data;
             int verticesCount = this.vertices.Length;
             degeneratedTriangles = 0;
-            Triangle t, t1, t2;
-            Vertex v, vxa, vxb;
+            Triangle t1, t2;
+            Vertex vxa, vxb;
             Edge e = null;
+
             this.edgesRA = new ResizableArray<Edge>(triangleCount * 3);
             var edges = this.edgesRA.Data;
             int[,] edgeBorder = new int[triangleCount * 3, 3];
@@ -358,7 +353,7 @@ namespace UnityMeshSimplifier
                 int start = 0;
                 for (int i = 0; i < verticesCount; i++)
                 {
-                    v = vertices[i];
+                    ref var v = ref verticesData[i];
                     v.estart = start;
                     v.ecount = 0;
                     start += v.tcount * 2;
@@ -372,9 +367,12 @@ namespace UnityMeshSimplifier
                 // create edges, init qTwice, init border
                 for (int i = 0; i < triangleCount; i++)
                 {
-                    t = triangles[i];
+                    ref var t = ref trianglesData[i];
                     if (t.deleted)
+                    {
                         continue;
+                    }
+
                     // skip degenerated triangle (it happens when using smart linking on cad from external apps)
                     if ((t.v0 == t.v1) || (t.v1 == t.v2) || (t.v2 == t.v0))
                     {
@@ -388,8 +386,8 @@ namespace UnityMeshSimplifier
                     {
                         // create or get this edge
                         int vb = t[(j + 1) % TriangleEdgeCount];
-                        vxa = vertices[va];
-                        vxb = vertices[vb];
+                        vxa = verticesData[va];
+                        vxb = verticesData[vb];
                         ulong ekey = Edge.CalculateKey(va, vb);
                         bool edgeDoesNotExist = true;
 
@@ -419,7 +417,9 @@ namespace UnityMeshSimplifier
                         edgeBorder[e.index, 0] = ++trisCount;
                         // No more than 2 triangles are required for the test
                         if (trisCount <= 2)
+                        {
                             edgeBorder[e.index, trisCount] = t.index;
+                        }
 
                         va = vb;
                     }
@@ -438,35 +438,30 @@ namespace UnityMeshSimplifier
                 if (edgeBorder[i, 0] == 1) // only one triangle along this edge
                 {
                     e.isBorder2D = true;
-                    //DebugMeshPerf.Data.nrBorder2D++;
                 }
                 else if (edgeBorder[i, 0] == 2)
                 {
-                    t1 = triangles[edgeBorder[i, 1]];
-                    t2 = triangles[edgeBorder[i, 2]];
+                    t1 = trianglesData[edgeBorder[i, 1]];
+                    t2 = trianglesData[edgeBorder[i, 2]];
                     if (Vector3d.Dot(ref t1.n, ref t2.n) < -0.9999) // double faced plane
                     {
                         e.isBorder2D = true;
-                        //DebugMeshPerf.Data.nrBorder2D++;
                     }
                 }
 
-                if (vertices[e.vertexA].uvSeamEdge && vertices[e.vertexB].uvSeamEdge)
+                if (verticesData[e.vertexA].uvSeamEdge && verticesData[e.vertexB].uvSeamEdge)
                 {
                     e.isUVSeam = true;
-                    //DebugMeshPerf.Data.nrUVSeamEdge++;
                 }
-                else if (vertices[e.vertexA].uvFoldoverEdge && vertices[e.vertexB].uvFoldoverEdge)
+                else if (verticesData[e.vertexA].uvFoldoverEdge && verticesData[e.vertexB].uvFoldoverEdge)
                 {
                     e.isUVFoldover = true;
-                    //DebugMeshPerf.Data.nrUVFoldoverEdge++;
                 }
 
-                if ((e.isBorder2D && PreserveBorderEdges) || (e.isUVSeam && PreserveUVSeamEdges) ||
-                    (e.isUVFoldover && PreserveUVFoldoverEdges))
+                if ((e.isBorder2D && PreserveBorderEdges) || (e.isUVSeam && PreserveUVSeamEdges) || (e.isUVFoldover && PreserveUVFoldoverEdges))
                 {
-                    t1 = triangles[edgeBorder[i, 1]];
-                    CalculateEdgePenaltyMatrix(t1, e);
+                    t1 = trianglesData[edgeBorder[i, 1]];
+                    CalculateEdgePenaltyMatrix(ref t1, e);
                     DistributeEdgePenaltyMatrix(e);
                 }
             }
@@ -485,10 +480,9 @@ namespace UnityMeshSimplifier
 
         private void RemoveEdgePass(int trisToDelete, ref int deletedTris)
         {
-            var triangles = this.triangles.Data;
-            var vertices = this.vertices.Data;
-            var vtx2edges = this.vtx2edges.Data;
-            var edgesL = this.edgesL;
+            var trianglesData = this.triangles.Data;
+            var verticesData = this.vertices.Data;
+            var vtx2EdgesData = this.vtx2edges.Data;
 
             List<Edge> edgesLRejected = new List<Edge>();
             int recycleRejectedEdges = (int) (edgesL.Count * RecycleRejectedEdgesThreshold);
@@ -499,41 +493,34 @@ namespace UnityMeshSimplifier
             Dictionary<int, int> AttributeMapping = new Dictionary<int, int>();
 
             Edge edgeAssessed = null, edgeToMove = null, survivedEdge = null;
-            Vertex survivedVertex, deletedVertex;
             Vector3 barycentricCoord = new Vector3();
             int survivedIndex = -1, deletedIndex = -1, thirdIndex = -1;
             int rankSurvivedIndex = -1, rankDeletedIndex = -1, rankThirdIndex = -1;
 
             int currentEdgeRank = 0;
 
-
             while ((trisToDelete > deletedTris) && (currentEdgeRank < edgesL.Count))
             {
-                //DebugMeshPerf.Data.nrLoopTest++;
-
                 int index = currentEdgeRank++;
                 edgeAssessed = edgesL[index];
 
                 // skip deleted edges
                 if (edgeAssessed.isDeleted)
+                {
                     continue;
+                }
 
                 // need re-sorting this edge
                 if (edgeAssessed.error > edgeAssessed.errorKeyed)
                 {
                     CalculateEdgeError(edgeAssessed);
-                    //DebugMeshPerf.Data.nrErrorEval++; //
                     edgeAssessed.errorKeyed = edgeAssessed.error;
+                    edgesL[index] = edgeAssessed;
                     edgesL.AddSortedFromPosition(currentEdgeRank, edgeAssessed);
-                    //DebugMeshPerf.Data.nrEdgeReinsert++;
                     continue;
                 }
 
-                else if (edgeAssessed.error < edgeAssessed.errorKeyed)
-                {
-                    //DebugMeshPerf.Data.nrEdgeLag++;
-                }
-
+                // BUG: `trisTouchingBothVertices` lost references and don't update `triangles`
                 // retrieve all triangles touching this edge
                 if (!ValidateContractionThenUpdateTrisNormals(
                         edgeAssessed,
@@ -545,12 +532,11 @@ namespace UnityMeshSimplifier
                     ))
                 {
                     edgesLRejected.Add(edgeAssessed);
-                    //DebugMeshPerf.Data.nrEdgeRejected++;
                     continue;
                 }
 
-                survivedVertex = vertices[survivedIndex];
-                deletedVertex = vertices[deletedIndex];
+                ref Vertex survivedVertex = ref verticesData[survivedIndex];
+                ref Vertex deletedVertex = ref verticesData[deletedIndex];
 
                 // triangles to delete
                 int deletedCount = 0;
@@ -558,6 +544,7 @@ namespace UnityMeshSimplifier
                 for (var index1 = 0; index1 < trisTouchingBothVertices.Count; index1++)
                 {
                     var t = trisTouchingBothVertices[index1];
+
                     // interpolate vertex attributes of new point p on the deleted edge
 
                     for (int i = 0; i <= TriangleEdgeCount; i++)
@@ -567,7 +554,10 @@ namespace UnityMeshSimplifier
                             rankSurvivedIndex = i;
                             rankDeletedIndex = (i + 1) % TriangleEdgeCount; // guess
                             if (t[rankDeletedIndex] != deletedIndex) // verify
+                            {
                                 rankDeletedIndex = (i + 2) % TriangleEdgeCount;
+                            }
+
                             rankThirdIndex = TriangleEdgeCount - rankDeletedIndex - rankSurvivedIndex;
                             thirdIndex = t[rankThirdIndex];
                             break;
@@ -585,7 +575,7 @@ namespace UnityMeshSimplifier
                             ref edgeAssessed.p,
                             ref survivedVertex.p,
                             ref deletedVertex.p,
-                            ref vertices[thirdIndex].p,
+                            ref verticesData[thirdIndex].p,
                             out barycentricCoord
                         );
                         InterpolateVertexAttributes(ia0, ia0, ia1, ia2, ref barycentricCoord);
@@ -603,14 +593,13 @@ namespace UnityMeshSimplifier
                     var t = trisTouchingDeletedVertexOnly[i];
                     rankDeletedIndex = t.refCached.tvertex;
                     t[rankDeletedIndex] = survivedIndex;
-                    trisTouchingDeletedVertexOnly[i] = t;
 
-                    int SurvivedAttrib;
-                    if (AttributeMapping.TryGetValue(t.GetAttributeIndex(rankDeletedIndex), out SurvivedAttrib))
+                    if (AttributeMapping.TryGetValue(t.GetAttributeIndex(rankDeletedIndex), out var survivedAttrib))
                     {
-                        t.SetAttributeIndex(rankDeletedIndex, SurvivedAttrib);
+                        t.SetAttributeIndex(rankDeletedIndex, survivedAttrib);
                     }
 
+                    trisTouchingDeletedVertexOnly[i] = t;
                     trisTouchingSurvivedVertexOnly.Add(t);
                 }
 
@@ -618,21 +607,26 @@ namespace UnityMeshSimplifier
                 edgeAssessed.isDeleted = true;
                 for (int i = 0; i < deletedVertex.ecount; i++)
                 {
-                    edgeToMove = vtx2edges[deletedVertex.estart + i];
+                    edgeToMove = vtx2EdgesData[deletedVertex.estart + i];
                     if (!edgeToMove.isDeleted)
                     {
                         ulong dkey;
                         if (edgeToMove.vertexA == deletedIndex)
+                        {
                             dkey = Edge.CalculateKey(survivedIndex, edgeToMove.vertexB);
+                        }
                         else
+                        {
                             dkey = Edge.CalculateKey(survivedIndex, edgeToMove.vertexA);
+                        }
+
                         bool canAttach = true;
                         for (int j = 0; j < survivedVertex.ecount; j++)
                         {
-                            if (vtx2edges[survivedVertex.estart + j].key == dkey)
+                            if (vtx2EdgesData[survivedVertex.estart + j].key == dkey)
                             {
                                 canAttach = false;
-                                survivedEdge = vtx2edges[survivedVertex.estart + j];
+                                survivedEdge = vtx2EdgesData[survivedVertex.estart + j];
                                 break;
                             }
                         }
@@ -671,21 +665,25 @@ namespace UnityMeshSimplifier
                 {
                     survivedEdge = this.vtx2edges[survivedVertex.estart + i];
                     if (!survivedEdge.isDeleted)
+                    {
                         this.vtx2edges.Add(survivedEdge);
+                    }
                 }
 
                 for (int i = 0; i < deletedVertex.ecount; i++)
                 {
                     survivedEdge = this.vtx2edges[deletedVertex.estart + i];
                     if (!survivedEdge.isDeleted)
+                    {
                         this.vtx2edges.Add(survivedEdge);
+                    }
                 }
 
                 int ecount = this.vtx2edges.Length - estart;
                 survivedVertex.estart = estart;
                 survivedVertex.ecount = ecount;
                 deletedVertex.ecount = 0;
-                vtx2edges = this.vtx2edges.Data;
+                vtx2EdgesData = this.vtx2edges.Data;
 
                 survivedVertex.p = edgeAssessed.p;
 
@@ -694,30 +692,25 @@ namespace UnityMeshSimplifier
                 //           Also border penalty matrices calculated on the edges need to be propagated to vertices.
                 //  setp 2 - calculate edges error E and optimal vertex position p on all edges touching V0 and V1
                 {
-                    Triangle t0, t1;
-                    Vertex v0, v1;
                     Edge e0, e1;
 
                     // step 1 : update quadrics matrices
                     // 1a) reset all matrices
-                    v0 = survivedVertex;
+                    ref Vertex v0 = ref survivedVertex;
                     v0.q.Clear();
                     v0.qPenaltyEdge.Clear();
 
                     for (int i = 0; i < v0.ecount; i++)
                     {
-                        e0 = vtx2edges[v0.estart + i];
+                        e0 = vtx2EdgesData[v0.estart + i];
                         // vertex at opposite end
-                        if (e0.vertexA == v0.index)
-                            v1 = vertices[e0.vertexB];
-                        else
-                            v1 = vertices[e0.vertexA];
+                        ref Vertex v1 = ref verticesData[e0.vertexA == v0.index ? e0.vertexB : e0.vertexA];
                         v1.q.Clear();
                         v1.qPenaltyEdge.Clear();
 
                         for (int j = 0; j < v1.ecount; j++)
                         {
-                            e1 = vtx2edges[v1.estart + j]; // note that one of the e1 is also e0
+                            e1 = vtx2EdgesData[v1.estart + j]; // note that one of the e1 is also e0
                             e1.qTwice.Clear();
                             e1.flagCalculateQstate = Edge.QState.QIsNotCalculated;
                         }
@@ -726,21 +719,21 @@ namespace UnityMeshSimplifier
                     // 1b) Calculate quadrics matrices
                     for (int i = 0; i < v0.ecount; i++)
                     {
-                        e0 = vtx2edges[v0.estart + i];
+                        e0 = vtx2EdgesData[v0.estart + i];
                         // vertex at opposite end
-                        if (e0.vertexA == v0.index)
-                            v1 = vertices[e0.vertexB];
-                        else
-                            v1 = vertices[e0.vertexA];
+                        ref var v1 = ref verticesData[e0.vertexA == v0.index ? e0.vertexB : e0.vertexA];
 
                         for (int j = 0; j < v1.ecount; j++)
                         {
-                            e1 = vtx2edges[v1.estart + j]; // note that one of the e1 is also e0
+                            e1 = vtx2EdgesData[v1.estart + j]; // note that one of the e1 is also e0
                             for (int k = 0; k < v1.tcount; k++)
                             {
-                                t1 = triangles[refs[v1.tstart + k].tid];
+                                var t1 = trianglesData[refs[v1.tstart + k].tid];
                                 if (t1.deleted)
+                                {
                                     continue;
+                                }
+
                                 if (e1.flagCalculateQstate != Edge.QState.QIsCalculated)
                                 {
                                     // is e1 an edge of triangle t1 ?
@@ -754,7 +747,7 @@ namespace UnityMeshSimplifier
                                                 (e1.isUVFoldover && PreserveUVFoldoverEdges))
                                             && (e1.flagCalculateQstate == Edge.QState.QIsNotCalculated))
                                         {
-                                            CalculateEdgePenaltyMatrix(t1, e1);
+                                            CalculateEdgePenaltyMatrix(ref t1, e1);
                                             e1.flagCalculateQstate = Edge.QState.QPenaltyIsCalculated;
                                         }
                                     }
@@ -765,20 +758,28 @@ namespace UnityMeshSimplifier
 
                             if ((e1.isBorder2D && PreserveBorderEdges) || (e1.isUVSeam && PreserveUVSeamEdges) ||
                                 (e1.isUVFoldover && PreserveUVFoldoverEdges))
-                                DistributeEdgePenaltyMatrix(e1, v1);
+                            {
+                                DistributeEdgePenaltyMatrix(e1, ref v1);
+                            }
+
                             e1.flagCalculateQstate = Edge.QState.QIsCalculated;
                         }
 
                         if ((e0.isBorder2D && PreserveBorderEdges) || (e0.isUVSeam && PreserveUVSeamEdges) ||
                             (e0.isUVFoldover && PreserveUVFoldoverEdges))
-                            DistributeEdgePenaltyMatrix(e0, v0);
+                        {
+                            DistributeEdgePenaltyMatrix(e0, ref v0);
+                        }
                     }
 
                     for (int k = 0; k < v0.tcount; k++)
                     {
-                        t0 = triangles[refs[v0.tstart + k].tid];
+                        var t0 = trianglesData[refs[v0.tstart + k].tid];
                         if (t0.deleted)
+                        {
                             continue;
+                        }
+
                         v0.q.Add(ref t0.n, ref v0.p);
                     }
 
@@ -789,11 +790,10 @@ namespace UnityMeshSimplifier
                     //// 2- the accuracy is better if I recalculate the edge error at the beginning of the main loop
                     for (int i = 0; i < v0.ecount; i++)
                     {
-                        e0 = vtx2edges[v0.estart + i];
+                        e0 = vtx2EdgesData[v0.estart + i];
                         if (e0.flagCalculateQstate != Edge.QState.ErrorIsCalculated)
                         {
                             CalculateEdgeError(e0);
-                            //DebugMeshPerf.Data.nrErrorEval++;
                             e0.flagCalculateQstate = Edge.QState.ErrorIsCalculated;
                         }
                     }
@@ -816,11 +816,9 @@ namespace UnityMeshSimplifier
                     }
 
                     edgesLRejected.Clear();
-                    recycleRejectedEdges +=
-                        (int) ((edgesL.Count - currentEdgeRank) *
-                            RecycleRejectedEdgesThreshold); // slow down rate to avoid stalling the algorithm; could be improved !
+                    // slow down rate to avoid stalling the algorithm; could be improved !
+                    recycleRejectedEdges += (int) ((edgesL.Count - currentEdgeRank) * RecycleRejectedEdgesThreshold);
                 }
-
 
                 deletedTris += deletedCount;
                 //DebugMeshPerf.Data.nrLoopComplete++;
@@ -836,7 +834,6 @@ namespace UnityMeshSimplifier
             quality = Mathf.Clamp01(quality);
 
             int deletedTris = 0;
-            var triangles = this.triangles.Data;
             int triangleCount = this.triangles.Length;
             int trisToDelete = (int) (triangleCount * (1.0f - quality));
 
@@ -844,20 +841,7 @@ namespace UnityMeshSimplifier
             InitEdges(out deletedTris);
             RemoveEdgePass(trisToDelete, ref deletedTris);
 
-
-            if (trisToDelete > deletedTris)
-            {
-                //Debug.Log("Unable to delete the specified number of triangles");
-            }
-
             CompactMesh();
-
-            if (verbose)
-            {
-                //DebugMeshPerf.Data.nrTrisBefore = triangleCount;
-                //DebugMeshPerf.Data.nrTrisAfter = triangleCount - deletedTris;
-                //Debug.Log(DebugMeshPerf.Data);
-            }
         }
     }
 }

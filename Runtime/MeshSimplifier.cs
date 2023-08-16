@@ -1207,9 +1207,9 @@ namespace UnityMeshSimplifier
                 int start2 = vertices[v2].tstart;
                 int count2 = vertices[v2].tcount++;
 
-                refs[start0 + count0].Set(i, 0);
-                refs[start1 + count1].Set(i, 1);
-                refs[start2 + count2].Set(i, 2);
+                refs[start0 + count0] = new Ref(i, 0);
+                refs[start1 + count1] = new Ref(i, 1);
+                refs[start2 + count2] = new Ref(i, 2);
             }
         }
         #endregion
