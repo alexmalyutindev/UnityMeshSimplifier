@@ -53,7 +53,7 @@ namespace UnityMeshSimplifier
     /// The mesh simplifier.
     /// Deeply based on https://github.com/sp4cerat/Fast-Quadric-Mesh-Simplification but rewritten completely in C#.
     /// </summary>
-    public sealed class MeshSimplifier
+    public sealed partial class MeshSimplifier
     {
         #region Consts & Static Read-Only
         private const int TriangleEdgeCount = 3;
@@ -1207,9 +1207,9 @@ namespace UnityMeshSimplifier
                 int start2 = vertices[v2].tstart;
                 int count2 = vertices[v2].tcount++;
 
-                refs[start0 + count0].Set(i, 0);
-                refs[start1 + count1].Set(i, 1);
-                refs[start2 + count2].Set(i, 2);
+                refs[start0 + count0] = new Ref(i, 0);
+                refs[start1 + count1] = new Ref(i, 1);
+                refs[start2 + count2] = new Ref(i, 2);
             }
         }
         #endregion
